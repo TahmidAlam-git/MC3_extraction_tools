@@ -1,17 +1,16 @@
 #!/usr/bin/python3
 import os
-import sys
 import math
 import struct
 
 
-def convert(fname):
+def convert(hfile, fname):
 
     '''
     example: vroot_bmpf_bone_bumpf_stk_350z_bumpf_stk_350z_geo.mesh.xbck
     nissan 350z stock front bumper mesh, beginning header
 
-    header part 1
+    header part 0
     always useless starting 8 lines
     00 9A 9E 82 16 00 00 00 01 00 00 00 B0 3F 00 00
     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
@@ -22,7 +21,7 @@ def convert(fname):
     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
     00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 
-    header part 2
+    header part 1
     70 B6 5D 00 00 00 71 1C 09 00 00 00 20 9A 9E 82
                             ^^ ^^ ^^ ^^
     how many numbers there are at the end of this part of the header(before the multi CD padding)
@@ -32,7 +31,7 @@ def convert(fname):
     17 00 05 00 05 00 14 00 18 00 01 00 13 00 05 00 <= 8 numbers here
     19 00 CD CD CD CD CD CD CD CD CD CD CD CD CD CD <= 1 number here, 9 total
 
-    header part 3
+    header part 2
     09 00 00 00 <= value represents how many "sets" there are
 
     sets are 24 bytes long, ends with CD CD
@@ -55,30 +54,25 @@ def convert(fname):
     D0 D2 9E 82 C1 5E 80 00 59 00 1C 00 02 4A 04 00
     00 00 00 00 01 00 CD CD
 
-    header part 4
+    header part 3
     last part of header always ends with 4 00, + CD padding if neeeded
     01 00 00 00 30 9B 9E 02 00 00 00 00 CD CD CD CD CD CD CD CD
     '''
 
 
-    hfile = open(fname, "rb")
-
     l_len = 16
 
     # header part 1
-    hfile.read(8 * l_len)
-
-    # header part 2
     hfile.read(8)
     pieces = int.from_bytes(hfile.read(4), byteorder='little')
     hfile.read(4)
     hfile.read(l_len + math.ceil(pieces / 8) * l_len)
 
-    # header part 3
+    # header part 2
     sets_num = int.from_bytes(hfile.read(4), byteorder='little')
     hfile.read(sets_num * 24)
 
-    # header part 4
+    # header part 3
     hfile.read(12)
     if hfile.tell() % 16 != 0:
         hfile.read(16 - (hfile.tell() % 16))
@@ -154,13 +148,15 @@ def convert(fname):
                 faces.append((shorts[x], shorts[x - 1], shorts[x - 2]))
                 forward = True
 
-    hfile.close()
+
+    if os.path.exists("./vehicle_objs") == False:
+        os.mkdir("./vehicle_objs")
 
     # Make obj file
-    if os.path.exists("./" + fname + '.obj'):
-        os.remove("./" + fname + '.obj')
+    if os.path.exists("./vehicle_objs/" + fname + '.obj'):
+        os.remove("./vehicle_objs/" + fname + '.obj')
 
-    obj = open(fname + '.obj', 'a')
+    obj = open("./vehicle_objs/" + fname + '.obj', 'a')
 
     for vert in vertices:
         obj.write('v ' + str(vert[0]) + ' ' + str(vert[1]) + ' ' + str(vert[2]) + '\n')
@@ -178,8 +174,58 @@ def convert(fname):
     obj.close()
 
 
+def convert_meshxbck(fname):
 
-if len(sys.argv) >= 2 and sys.argv[-1].endswith("mesh.xbck"):
-    convert(sys.argv[-1])
-else:
-    print("invalid file")
+    hfile = open(fname, "rb")
+    hfile.read(16 * 8)
+    convert(hfile, fname)
+    hfile.close()
+
+
+def convert_gmesh(fname):
+
+    vrootHEX = b'\x76\x72\x6F\x6F\x74'
+    meshHEX = b'\x6D\x65\x73\x68\x00'
+
+    # first find where the models are placed
+    hfile = open(fname, 'rb')
+
+    last = 0
+    while 1:
+
+        #  Find the model name start
+        hfile.seek(0)
+        name_start = hfile.read().find(vrootHEX, last)
+        if name_start == -1:
+            break
+
+        #  Find the end of the model name
+        hfile.seek(0)
+        name_end = hfile.read().find(meshHEX, name_start, name_start + 200)
+        if name_end == -1:
+            break
+
+        #  Get the name of the model
+        hfile.seek(name_start)
+        name = hfile.read(name_end + 4 - name_start).decode('ascii')
+        hfile.read(1)
+
+        #  Get the index of the start of the model
+        if hfile.tell() % 16 != 0:
+            hfile.read(16 - (hfile.tell() % 16))
+
+        convert(hfile, name.strip())
+
+        last = name_end
+
+    hfile.close()
+
+
+
+fnames = os.listdir()
+for fname in fnames:
+    if fname.endswith("mesh.xbck"):
+        convert_meshxbck(fname)
+    elif fname.endswith("g.xbck"):
+        convert_gmesh(fname)
+
