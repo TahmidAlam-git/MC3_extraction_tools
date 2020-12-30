@@ -10,10 +10,12 @@ version 1.02:
 
 can now extract models from map files
 
+
 version 1.01: 
 
 .exe now available
 can now extract models from most g.xbck files
+
 
 version 1.00: 
 
