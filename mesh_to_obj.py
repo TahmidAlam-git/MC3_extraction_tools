@@ -254,7 +254,7 @@ def find_models(hfile, name_starts_with_b):
         align_16(hfile)
         name_and_offsets.append((name, hfile.tell()))
         last = name_start + name_len
-        print("found: " + name)
+        #print("found: " + name)
 
     return name_and_offsets
 
@@ -293,10 +293,9 @@ def read_face_header(hfile, face_sections, ff_exists):
                             int.from_bytes(hfile.read(2), byteorder='little')))
         hfile.read(4)
 
-    if ff_exists:
-        hfile.read(4)
-    else:
-        align_16(hfile)
+    #if ff_exists:
+    #    hfile.read(4)
+    align_16(hfile)
 
     return face_ranges
 
@@ -310,7 +309,6 @@ def read_ff(hfile, ff_num):
     align_16(hfile)
 
     hfile.read(4 * ff_num)
-    align_16(hfile)
 
 
 def read_vertices_uv(hfile, padding):
@@ -422,26 +420,43 @@ def read_map(file_name):
 
         for y in range(50):
 
+            #print("starting of model", hfile.tell())
+
             padding, face_sections, ff_sections = read_model_header(hfile)
+
+            #print("padding:", padding, "face_sections:", face_sections, "ff_sections:", ff_sections)
+
+            #print("starting of vertices", hfile.tell())
 
             # currently the only way to know when to stop looking for pieces of 1 model
             if not (padding == 8 or padding == 12 or padding == 16 or padding == 20):
                 break
 
             vertices, uvs = read_vertices_uv(hfile, padding)
+
+            #print("starting of face header", hfile.tell())
+
             face_range = read_face_header(hfile, face_sections, ff_sections > 0)
+
+            #print("starting of ff header", hfile.tell())
 
             if ff_sections > 0:
                 read_ff_header(hfile, ff_sections)
 
+            #print("starting of ff", hfile.tell())
+
             for x in range(ff_sections):
                 read_ff(hfile, len(vertices))
+
+            align_16(hfile)  # fix this
+
+            #print("starting of faces", hfile.tell())
 
             faces = read_faces(hfile, face_range)
 
             check[name] = z
             write_model("structures/" + name, name + "_part" + str(y + 1), vertices, uvs, faces)
-            print("Success!: " + name + "_part" + str(y + 1))
+            print("Success!: " + name + "_part" + str(y + 1) + " #" + str(z + 1))
 
     for m in model_offsets:
         if m[0] not in check:
