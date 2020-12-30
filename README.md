@@ -6,7 +6,7 @@ Instruction to use mesh_to_obj.exe (works for xbck files associated with most ve
 2. select the file, may have to wait a few seconds
 3. You're done! you're .obj files should appear in folders in the same location as the .exe
 
-version 1.02: 
+version 1.02(latest): 
 
 can now extract models from map files
 
