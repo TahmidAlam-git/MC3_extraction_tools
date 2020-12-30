@@ -7,7 +7,7 @@ Instruction to use mesh_to_obj.exe (works for xbck files associated with most ve
 3. You're done! you're .obj files should appear in folders in the same location as the .exe
 
 version 1.025(latest):
-- bug fix for models with vertex padding of 24
+- bug fix for models with vertex padding of 24 and incorrect faces
 - now prints to console the operations in process
 
 version 1.02: 
