@@ -2,7 +2,7 @@
 import os
 import math
 import struct
-
+import easygui
 
 def convert(hfile, fname):
 
@@ -174,21 +174,22 @@ def convert(hfile, fname):
     obj.close()
 
 
-def convert_meshxbck(fname):
+def convert_meshxbck(path):
 
-    hfile = open(fname, "rb")
+    hfile = open(path, "rb")
     hfile.read(16 * 8)
-    convert(hfile, fname)
+    convert(hfile, path.split("\\")[-1])
     hfile.close()
 
 
-def convert_gmesh(fname):
+def convert_gmesh(path):
 
     vrootHEX = b'\x76\x72\x6F\x6F\x74'
     meshHEX = b'\x6D\x65\x73\x68\x00'
 
     # first find where the models are placed
-    hfile = open(fname, 'rb')
+    hfile = open(path, 'rb')
+    fname = path.split("\\")[-1]
 
     last = 0
     while 1:
@@ -221,11 +222,230 @@ def convert_gmesh(fname):
     hfile.close()
 
 
+def align_16(hfile):
+    if hfile.tell() % 16 != 0:
+        hfile.read(16 - (hfile.tell() % 16))
 
-fnames = os.listdir()
-for fname in fnames:
-    if fname.endswith("mesh.xbck"):
-        convert_meshxbck(fname)
-    elif fname.endswith("g.xbck"):
-        convert_gmesh(fname)
+
+def find_models(hfile, name_starts_with_b):
+    name_ending_with_b = bytes(1)
+    name_and_offsets = []  # type = Tuple, (name, offset to the header)
+
+    last = 0
+    while 1:
+
+        #  Find the model name start
+        hfile.seek(0)
+        name_start = hfile.read().find(name_starts_with_b, last)
+        if name_start == -1:
+            break
+
+        #  Find the end of the model name
+        hfile.seek(name_start)
+        name_len = hfile.read().find(name_ending_with_b)
+        if name_len == -1:
+            break
+
+        #  Get the name of the model
+        hfile.seek(name_start + 1)
+        name = hfile.read(name_len - 1).decode('utf-8')
+        hfile.read(1)
+
+        align_16(hfile)
+        name_and_offsets.append((name, hfile.tell()))
+        last = name_start + name_len
+
+    return name_and_offsets
+
+
+def read_model_header(hfile):
+    hfile.read(7)
+    padding = int.from_bytes(hfile.read(1), byteorder='little') - 12
+    face_sections = int.from_bytes(hfile.read(2), byteorder='little')
+    ff_sections = int.from_bytes(hfile.read(2), byteorder='little')
+    hfile.read(4)
+
+    # unknown line
+    hfile.read(16)
+
+    # face thing
+    hfile.read(face_sections * 2)
+    align_16(hfile)
+
+    # set thing
+    set_sections = int.from_bytes(hfile.read(2), byteorder='little')
+    hfile.read(2)
+    hfile.read(set_sections * 24)
+
+    # ending of header thing
+    hfile.read(12)
+    align_16(hfile)
+
+    return padding, face_sections, ff_sections
+
+
+def read_face_header(hfile, face_sections, ff_exists):
+    face_ranges = []
+    for x in range(face_sections):
+        hfile.read(4)
+        face_ranges.append((int.from_bytes(hfile.read(2), byteorder='little'),
+                            int.from_bytes(hfile.read(2), byteorder='little')))
+        hfile.read(4)
+
+    if ff_exists:
+        hfile.read(4)
+    else:
+        align_16(hfile)
+
+    return face_ranges
+
+
+def read_ff_header(hfile, ff_sections):
+    hfile.read(4)
+    hfile.read(ff_sections * 4)
+
+def read_ff(hfile, ff_num):
+    hfile.read(12)
+    align_16(hfile)
+
+    hfile.read(4 * ff_num)
+    align_16(hfile)
+
+
+def read_vertices_uv(hfile, padding):
+
+    vertices = []
+    uvs = []
+    uv_padding = padding - 8
+
+    # TODO: find the amount of vertices from header instead
+    # get the vertices and UVs
+    while 1:
+        x = struct.unpack('f', hfile.read(4))[0]
+        y = struct.unpack('f', hfile.read(4))[0]
+        z = struct.unpack('f', hfile.read(4))[0]
+
+        # check if we are at the faces header
+        hfile.seek(-12, 1)
+        a = hfile.read(1)
+        b = hfile.read(1)
+        c = hfile.read(1)
+        d = hfile.read(1)
+        hfile.read(4)
+        e = hfile.read(1)
+        f = hfile.read(1)
+        g = hfile.read(1)
+        h = hfile.read(1)
+
+        # only way to find when the vertices end
+        if a == b'\x01' and b == c == d == e == f == g == h == b'\x00':
+            hfile.seek(-12, 1)
+            break
+
+        vertices.append((x, y, z))
+
+        hfile.read(uv_padding)
+        uva = struct.unpack('f', hfile.read(4))[0]
+        uvb = struct.unpack('f', hfile.read(4))[0]
+        uvs.append((uva, uvb))
+
+    return vertices, uvs
+
+
+def read_faces(hfile, model_ranges):
+    faces = []
+
+    # Get shorts of the faces
+    shorts = []
+    for x in range(model_ranges[-1][0] + model_ranges[-1][1]):
+        shorts.append(int.from_bytes(hfile.read(2), byteorder='little') + 1)
+
+    # Get the faces
+    for piece in model_ranges:
+        forward = True
+        for x in range(piece[0] + 2, piece[0] + piece[1]):
+
+            if forward:
+                faces.append((shorts[x - 2], shorts[x - 1], shorts[x - 0]))
+                forward = False
+            else:
+                faces.append((shorts[x], shorts[x - 1], shorts[x - 2]))
+                forward = True
+
+    align_16(hfile)
+
+    return faces
+
+
+def write_model(folder, name, vertices, uvs, faces):
+
+    # make folder
+    if os.path.exists("./" + folder) == False:
+        os.mkdir("./" + folder)
+
+    # Make obj file
+    if os.path.exists("./" + folder + "/" + name + ".obj"):
+        os.remove("./" + folder + "/" + name + ".obj")
+
+    obj = open("./" + folder + "/" + name + ".obj", 'a')
+
+    for vert in vertices:
+        obj.write('v ' + str(vert[0]) + ' ' + str(vert[1]) + ' ' + str(vert[2]) + '\n')
+
+    for uv in uvs:
+        obj.write('vt ' + str(uv[0]) + ' ' + str(uv[1]) + '\n')
+
+    for f in faces:
+        obj.write('f ' + str(f[0]) + ' ' + str(f[1]) + ' ' + str(f[2]) + '\n')
+
+    obj.close()
+
+
+
+def read_map(file_name):
+    hfile = open(file_name, 'rb')
+    model_offsets = find_models(hfile, b'\xCD\x73\x5F')
+
+    if os.path.exists("./" + "structures") == False:
+        os.mkdir("./" + "structures")
+
+    for model in model_offsets:
+        name = model[0]
+        offset = model[1]
+
+        hfile.seek(offset)
+
+        for y in range(20):
+
+            padding, face_sections, ff_sections = read_model_header(hfile)
+
+            # currently the only way to know when to stop looking for pieces of 1 model
+            if not (padding == 8 or padding == 12 or padding == 16):
+                break
+
+            vertices, uvs = read_vertices_uv(hfile, padding)
+            face_range = read_face_header(hfile, face_sections, ff_sections > 0)
+
+            if ff_sections > 0:
+                read_ff_header(hfile, ff_sections)
+
+            for x in range(ff_sections):
+                read_ff(hfile, len(vertices))
+
+            faces = read_faces(hfile, face_range)
+            write_model("structures/" + name, name + "_part" + str(y + 1), vertices, uvs, faces)
+
+
+path = easygui.fileopenbox()
+
+# TODO: add more subfolders for vehicles and map models for better searchability
+# TODO: change mesh.xbck and g.xbck to the new way that read_map is now for readability and code style
+if path.endswith("mesh.xbck"):
+    convert_meshxbck(path)
+elif path.endswith("g.xbck"):
+    convert_gmesh(path)
+else:
+    read_map(path)
+
+
 
