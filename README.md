@@ -3,7 +3,7 @@ programs to extract assets from Midnight Club 3
 
 Instruction to use mesh_to_obj.exe (works for xbck files associated with most vehicles and maps):
 1. run the .exe, may take a few seconds to start the file explorer
-2. select the file, may have to wait a few seconds
+2. select the file, may have to wait a few seconds with a blank terminal, much longer for map files
 3. You're done! you're .obj files should appear in folders in the same location as the .exe
 
 version 1.02(latest): 
