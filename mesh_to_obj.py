@@ -254,6 +254,7 @@ def find_models(hfile, name_starts_with_b):
         align_16(hfile)
         name_and_offsets.append((name, hfile.tell()))
         last = name_start + name_len
+        print("found: " + name)
 
     return name_and_offsets
 
@@ -406,21 +407,25 @@ def read_map(file_name):
     hfile = open(file_name, 'rb')
     model_offsets = find_models(hfile, b'\xCD\x73\x5F')
 
+    check = {}
+
+    print("found %d model files" % len(model_offsets))
+
     if os.path.exists("./" + "structures") == False:
         os.mkdir("./" + "structures")
 
-    for model in model_offsets:
+    for z, model in enumerate(model_offsets):
         name = model[0]
         offset = model[1]
 
         hfile.seek(offset)
 
-        for y in range(20):
+        for y in range(50):
 
             padding, face_sections, ff_sections = read_model_header(hfile)
 
             # currently the only way to know when to stop looking for pieces of 1 model
-            if not (padding == 8 or padding == 12 or padding == 16):
+            if not (padding == 8 or padding == 12 or padding == 16 or padding == 20):
                 break
 
             vertices, uvs = read_vertices_uv(hfile, padding)
@@ -433,9 +438,17 @@ def read_map(file_name):
                 read_ff(hfile, len(vertices))
 
             faces = read_faces(hfile, face_range)
+
+            check[name] = z
             write_model("structures/" + name, name + "_part" + str(y + 1), vertices, uvs, faces)
+            print("Success!: " + name + "_part" + str(y + 1))
+
+    for m in model_offsets:
+        if m[0] not in check:
+            print("Unsuccessful: " + m[0])
 
 
+print("Starting file explorer, please wait")
 path = easygui.fileopenbox()
 
 # TODO: add more subfolders for vehicles and map models for better searchability
