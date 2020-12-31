@@ -295,7 +295,12 @@ def read_face_header(hfile, face_sections, ff_exists):
 
     #if ff_exists:
     #    hfile.read(4)
-    align_16(hfile)
+    #align_16(hfile)
+
+    while hfile.read(1) == b'\xCD':
+        pass
+
+    hfile.seek(-1, 1)
 
     return face_ranges
 
@@ -420,13 +425,13 @@ def read_map(file_name):
 
         for y in range(50):
 
-            #print("starting of model", hfile.tell())
+            #print("starting of model", hex(hfile.tell()))
 
             padding, face_sections, ff_sections = read_model_header(hfile)
 
             #print("padding:", padding, "face_sections:", face_sections, "ff_sections:", ff_sections)
 
-            #print("starting of vertices", hfile.tell())
+            #print("starting of vertices", hex(hfile.tell()))
 
             # currently the only way to know when to stop looking for pieces of 1 model
             if not (padding == 8 or padding == 12 or padding == 16 or padding == 20):
@@ -434,23 +439,23 @@ def read_map(file_name):
 
             vertices, uvs = read_vertices_uv(hfile, padding)
 
-            #print("starting of face header", hfile.tell())
+            #print("starting of face header", hex(hfile.tell()))
 
             face_range = read_face_header(hfile, face_sections, ff_sections > 0)
 
-            #print("starting of ff header", hfile.tell())
+            #print("starting of ff header", hex(hfile.tell()))
 
             if ff_sections > 0:
                 read_ff_header(hfile, ff_sections)
 
-            #print("starting of ff", hfile.tell())
+            #print("starting of ff", hex(hfile.tell()))
 
             for x in range(ff_sections):
                 read_ff(hfile, len(vertices))
 
             align_16(hfile)  # fix this
 
-            #print("starting of faces", hfile.tell())
+            #print("starting of faces", hex(hfile.tell()))
 
             faces = read_faces(hfile, face_range)
 
