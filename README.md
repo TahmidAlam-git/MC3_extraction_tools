@@ -14,7 +14,7 @@ version 1.025:
 - now prints to console the operations in process
 
 version 1.02: 
-- can now extract models from map files
+- can now extract models from San Diego map files
 
 version 1.01: 
 - .exe now available
