@@ -228,6 +228,7 @@ def align_16(hfile):
 
 
 def find_models(hfile, name_starts_with_b):
+    print("looking for files")
     name_ending_with_b = bytes(1)
     name_and_offsets = []  # type = Tuple, (name, offset to the header)
 
@@ -247,7 +248,7 @@ def find_models(hfile, name_starts_with_b):
             break
 
         #  Get the name of the model
-        hfile.seek(name_start + 1)
+        hfile.seek(name_start + 2)
         name = hfile.read(name_len - 1).decode('utf-8')
         hfile.read(1)
 
@@ -406,9 +407,9 @@ def write_model(folder, name, vertices, uvs, faces):
 
 
 
-def read_map(file_name):
+def read_map(file_name, lookfor):
     hfile = open(file_name, 'rb')
-    model_offsets = find_models(hfile, b'\xCD\x73\x5F')
+    model_offsets = find_models(hfile, lookfor)
 
     check = {}
 
@@ -475,10 +476,18 @@ path = easygui.fileopenbox()
 # TODO: change mesh.xbck and g.xbck to the new way that read_map is now for readability and code style
 if path.endswith("mesh.xbck"):
     convert_meshxbck(path)
+
 elif path.endswith("g.xbck"):
     convert_gmesh(path)
-else:
-    read_map(path)
+
+elif path.split("\\")[-1].startswith("sd"):
+    read_map(path, b'\xCD\xCD\x73\x5F')
+
+elif path.split("\\")[-1].startswith("atlanta"):
+    read_map(path, b'\xCD\xCD\x61\x5F')
+
+elif path.split("\\")[-1].startswith("detroit"):
+    read_map(path, b'\xCD\xCD\x64\x5F')
 
 
 
