@@ -6,10 +6,9 @@ Instruction to use mesh_to_obj.exe (works for xbck files associated with most ve
 2. select the file, may have to wait a few seconds with a blank terminal, much longer for map files
 3. You're done! you're .obj files should appear in folders in the same location as the .exe
 
-version 2.03(latest):
-- added support for Atlanta and Detroit map files
+- removed version 1.03(support for Atlanta and Detroit) as it broke a few things, will readd later when fixed.
 
-version 1.025:
+version 1.025(latest):
 - bug fix for models with vertex padding of 24 and incorrect faces
 - now prints to console the operations in process
 
