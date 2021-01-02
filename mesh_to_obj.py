@@ -248,7 +248,7 @@ def find_models(hfile, name_starts_with_b):
             break
 
         #  Get the name of the model
-        hfile.seek(name_start + 2)
+        hfile.seek(name_start + 1)
         name = hfile.read(name_len - 1).decode('utf-8')
         hfile.read(1)
 
@@ -481,13 +481,13 @@ elif path.endswith("g.xbck"):
     convert_gmesh(path)
 
 elif path.split("\\")[-1].startswith("sd"):
-    read_map(path, b'\xCD\xCD\x73\x5F')
+    read_map(path, b'\xCD\x73\x5F')
 
-elif path.split("\\")[-1].startswith("atlanta"):
-    read_map(path, b'\xCD\xCD\x61\x5F')
+#elif path.split("\\")[-1].startswith("atlanta"):
+#    read_map(path, b'xCD\x61\x5F')
 
-elif path.split("\\")[-1].startswith("detroit"):
-    read_map(path, b'\xCD\xCD\x64\x5F')
+#elif path.split("\\")[-1].startswith("detroit"):
+#    read_map(path, b'xCD\x64\x5F')
 
 
 
